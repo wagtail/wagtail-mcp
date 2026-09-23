@@ -46,7 +46,6 @@ Issues = "https://github.com/org-name-or-username/wagtail-mcp/issues"
 agent = [
     "django-ag-ui>=0.61.0",
     "pydantic-ai-slim[openai]>=2.45.0",
-    "uvicorn>=0.52.4",
 ]
 # Add funding link if needed.
 # Funding = "https://github.com/org-name-or-username/wagtail-mcp"

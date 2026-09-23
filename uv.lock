@@ -2284,7 +2284,6 @@ dependencies = [
 agent = [
     { name = "django-ag-ui" },
     { name = "pydantic-ai-slim", extra = ["openai"] },
-    { name = "uvicorn" },
 ]
 
 [package.dev-dependencies]
@@ -2303,7 +2302,6 @@ requires-dist = [
     { name = "django-ag-ui", marker = "extra == 'agent'", specifier = ">=0.61.0" },
     { name = "mcp", specifier = "==2.0.0" },
     { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'agent'", specifier = ">=2.45.0" },
-    { name = "uvicorn", marker = "extra == 'agent'", specifier = ">=0.52.4" },
     { name = "wagtail", specifier = ">=8.0" },
 ]
 provides-extras = ["agent"]

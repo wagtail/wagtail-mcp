@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-
+- The `agent` extra no longer pins `uvicorn`: the ASGI server is the
+  adopter's choice (`uvicorn`, `daphne`, ...). The demo's `just runserver-asgi`
+  injects `uvicorn` itself.
 - Documentation is split into user guides and reference under `docs/`, and contributor notes under `docs/contributing/`.
 
 ### Fixed
@@ -21,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `get_agent_config()` no longer falls back to environment variables for the
   agent's provider credentials: set them in `WAGTAIL_MCP`
   (`agent_api_key`, `agent_base_url`).
+- CI test jobs now install the `agent` extra (`uv sync --extra agent` /
+  `--extra agent`), fixing `ModuleNotFoundError: django_ag_ui` in
+  `test_flow_agent_run.py`, and the compatibility job's undefined
+  `matrix.packages` reference.
 
 ### Added
 

@@ -46,20 +46,20 @@ format: format-server format-client
 
 # Run tests with pytest.
 test:
-    uv run pytest
+    uv run --extra agent pytest
 
 test-lowest-deps:
     #!/usr/bin/env bash
     set -euo pipefail
     lowest_python=$(uv run python -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["requires-python"].removeprefix(">=").strip())')
-    uv run --isolated --python "$lowest_python" --resolution lowest-direct pytest
+    uv run --isolated --python "$lowest_python" --resolution lowest-direct --extra agent pytest
 
 test-highest-deps:
-    uv run --isolated --with 'Django, Wagtail' pytest
+    uv run --isolated --extra agent --with 'Django, Wagtail' pytest
 
 # Run tests with coverage.
 coverage:
-    uv run pytest --cov src/my_project_name
+    uv run --extra agent pytest --cov wagtail_mcp
     uv run coverage report -m
     uv run coverage html
 
@@ -73,10 +73,11 @@ runserver:
     uv run ./demo/manage.py runserver
 
 
-# Run the demo under ASGI (uvicorn) so the admin agent's SSE endpoint
-# streams incrementally. The agent is at /admin/wagtail_mcp/agent/.
+# Run the demo under ASGI so the admin agent's SSE endpoint streams
+# incrementally. The agent is at /admin/wagtail_mcp/agent/. Requires an ASGI
+# server installed separately (adopters choose: uvicorn, daphne, granian, ...).
 runserver-asgi:
-    cd demo && uv run uvicorn demo.asgi:application --reload --port 8000
+    cd demo && uv run --with 'uvicorn' uvicorn demo.asgi:application --reload --port 8000
 
 # Build the admin agent's frontend bundle (owned by the frontend session;
 # see package.json's build:agent script).
