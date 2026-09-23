@@ -24,8 +24,8 @@ class DjangoClient:
 
     Delegates to Django's typed verb methods (``get``/``post``/...) so redirects
     are followed natively, and encodes query params into the URL path. The
-    ``request(method, path, data, json, query_params, headers, FILES)``
-    signature keeps the ``_client()`` seam that tests patch.
+    ``request(method, path, data, json, query_params, headers, FILES, host,
+    port, secure)`` signature keeps the ``_client()`` seam that tests patch.
     """
 
     def __init__(self):
@@ -42,6 +42,7 @@ class DjangoClient:
         FILES=None,
         host=None,
         port=None,
+        secure=False,
     ):
 
         verb = method.upper()
@@ -78,8 +79,11 @@ class DjangoClient:
                 merged.update(FILES)
             client_kwargs["data"] = merged
 
-        # Match an HTTP client by following API redirects.
-        return call(path, follow=True, **client_kwargs)
+        # Match an HTTP client by following API redirects. ``secure`` marks the
+        # in-process request as https when the caller arrived over TLS, so
+        # ``SECURE_SSL_REDIRECT`` does not 301 it (Django re-issues followed
+        # 301s as GET, which would silently turn writes into reads).
+        return call(path, follow=True, secure=secure, **client_kwargs)
 
 
 def _client() -> DjangoClient:
@@ -112,6 +116,21 @@ def _host_parts() -> tuple[str | None, str | None]:
     return host, None
 
 
+def _secure() -> bool:
+    """Whether the in-process test client should speak HTTPS.
+
+    Mirrors the scheme of the MCP request currently being served (see
+    ``auth.current_scheme``): an outer https request dispatches as secure so
+    ``SECURE_SSL_REDIRECT`` does not 301 it, while a plain-http caller keeps
+    http semantics (scheme *and* port — Wagtail resolves sites on
+    hostname+port, so flipping the scheme without the caller's port would
+    change which site absolute URLs resolve against). With no request context
+    (e.g. direct ``dispatch`` use) the historical plain-http behaviour is
+    preserved.
+    """
+    return auth.current_scheme.get() == "https"
+
+
 @functools.cache
 def openapi() -> dict:
     """The live OpenAPI 3.1 document for the mounted v3 API (cached).
@@ -125,6 +144,7 @@ def openapi() -> dict:
         f"{MOUNT_PREFIX.rstrip('/')}/openapi.json",
         host=host_header,
         port=port,
+        secure=_secure(),
     )
     if response.status_code != 200:
         raise APIError(
@@ -258,6 +278,7 @@ def call_operation(
         FILES=upload_files,
         host=host_header,
         port=port,
+        secure=_secure(),
     )
 
     if response.status_code >= 400:

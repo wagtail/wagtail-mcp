@@ -124,9 +124,14 @@ def mcp_endpoint(request):
         except Exception:  # DisallowedHost and friends
             host = None
         context_host = auth.current_host.set(host)
+        # ``request.scheme`` honours SECURE_PROXY_SSL_HEADER, so behind a
+        # TLS-terminating proxy this is "https" for the usual browser/API
+        # traffic the MCP endpoint serves.
+        context_scheme = auth.current_scheme.set(request.scheme)
         try:
             return _handle_stateless(request, _build_scope(request))
         finally:
+            auth.current_scheme.reset(context_scheme)
             auth.current_host.reset(context_host)
     finally:
         auth.current_token.reset(context_token)

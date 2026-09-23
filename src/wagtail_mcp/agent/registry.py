@@ -20,10 +20,11 @@ from wagtail_mcp.server import get_server
 # Bound per run by ``agent_deps_factory``, read when a tool actually runs.
 _acting_user: ContextVar = ContextVar("wagtail_mcp_agent_acting_user", default=None)
 _acting_host: ContextVar = ContextVar("wagtail_mcp_agent_acting_host", default=None)
+_acting_scheme: ContextVar = ContextVar("wagtail_mcp_agent_acting_scheme", default=None)
 
 
 def agent_deps_factory(request: HttpRequest):
-    """Record the acting user and Host for this run.
+    """Record the acting user, Host and scheme for this run.
 
     Called on the event loop, so it does not touch the ORM. The API token is
     minted inside the tool, on pydantic-ai's worker thread.
@@ -36,6 +37,7 @@ def agent_deps_factory(request: HttpRequest):
     except Exception:  # DisallowedHost and friends — mirrors mcp_endpoint.
         host = None
     _acting_host.set(host)
+    _acting_scheme.set(request.scheme)
     return AgentDeps(user=user, ip_address=request.META.get("REMOTE_ADDR"))
 
 
@@ -54,10 +56,11 @@ def _is_destructive(tool: MCPTool) -> bool:
 
 
 def _as_acting_user(fn):
-    """Bind ``current_token`` / ``current_host`` around one tool call.
+    """Bind ``current_token`` / ``current_host`` / ``current_scheme`` around one tool call.
 
     Skips minting when a token is already bound, so a nested dispatch (the
-    upload fallback) reuses it.
+    upload fallback) reuses it. The scheme is reset after the call so it
+    cannot leak into unrelated dispatches on the same worker thread.
     """
 
     @functools.wraps(fn)
@@ -67,10 +70,18 @@ def _as_acting_user(fn):
             user = _acting_user.get()
             if user is not None:
                 auth.current_token.set(get_api_token(user))
-        host = _acting_host.get()
-        if host is not None and auth.current_host.get() is None:
-            auth.current_host.set(host)
-        return fn(*args, **kwargs)
+        scheme = _acting_scheme.get()
+        scheme_token = None
+        if scheme is not None and auth.current_scheme.get() is None:
+            scheme_token = auth.current_scheme.set(scheme)
+        try:
+            host = _acting_host.get()
+            if host is not None and auth.current_host.get() is None:
+                auth.current_host.set(host)
+            return fn(*args, **kwargs)
+        finally:
+            if scheme_token is not None:
+                auth.current_scheme.reset(scheme_token)
 
     return wrapper
 

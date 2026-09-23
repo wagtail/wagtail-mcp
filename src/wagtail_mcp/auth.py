@@ -10,6 +10,10 @@ current_token: ContextVar[str | None] = ContextVar("wagtail_mcp_token", default=
 # Caller ``Host`` for the in-process client. See docs/contributing/architecture.md.
 current_host: ContextVar[str | None] = ContextVar("wagtail_mcp_host", default=None)
 
+# Caller scheme (``"http"``/``"https"``) for the in-process client.
+# See docs/contributing/architecture.md.
+current_scheme: ContextVar[str | None] = ContextVar("wagtail_mcp_scheme", default=None)
+
 
 def resolve_bearer(request: HttpRequest) -> str | None:
     """Resolve ``Authorization: Bearer <token>`` to a valid APIToken's plaintext.

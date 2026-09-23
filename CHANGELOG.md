@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The admin agent is now fully opt-in: without the agent URLconf mount, no
   agent UI appears in the Wagtail admin, and the admin homepage no longer
   500s. `/admin/wagtail_mcp/agent/` renders setup instructions instead.
+- Forward the incoming request's scheme into the in-process dispatch client,
+  so `SECURE_SSL_REDIRECT=True` no longer silently turns every write into a
+  no-op read (the test client re-issues 301s as GET).
 
 ### Added
 

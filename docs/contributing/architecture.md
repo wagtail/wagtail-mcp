@@ -8,7 +8,7 @@ How a request becomes a v3 API call. Install and client setup are in the [user d
 
 Django's test client is used instead of django-ninja's `TestClient`. Ninja's client does not build a request Wagtail's page schemas can serialize (`html_url` needs a host). Notes for upstream are in [API feedback](api-feedback.md).
 
-The v3 API must be mounted at `/api/v3/` (`MOUNT_PREFIX`). Schema paths already include that prefix. When `WAGTAILAPI_BASE_URL` is unset, `auth.current_host` copies the caller's `Host` into the in-process client so absolute URLs are not Django's `testserver`.
+The v3 API must be mounted at `/api/v3/` (`MOUNT_PREFIX`). Schema paths already include that prefix. When `WAGTAILAPI_BASE_URL` is unset, `auth.current_host` copies the caller's `Host` into the in-process client so absolute URLs are not Django's `testserver`. Likewise, `auth.current_scheme` copies the caller's scheme into the client's `secure=` flag: with `SECURE_SSL_REDIRECT=True` a plain-http in-process call would be 301'd, and Django's client re-issues followed 301s as GET — silently turning every write into a no-op read (issue #5).
 
 ## HTTP transport
 

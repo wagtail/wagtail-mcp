@@ -12,6 +12,7 @@ from django.middleware.csrf import _get_new_csrf_string
 from django.test import AsyncClient
 from django.utils.timezone import now
 from mcp.server.mcpserver.exceptions import ToolError
+from wagtail.models import Page
 
 from wagtail_mcp import auth
 from wagtail_mcp.agent import auth as agent_auth
@@ -23,6 +24,12 @@ from wagtail_mcp.server import get_server
 pytestmark = pytest.mark.django_db
 
 ENDPOINT = "/admin/wagtail_mcp/agent/api/"
+
+
+@pytest.fixture
+def root_page():
+    # Wagtail's default home page (depth 2) from migrations.
+    return Page.objects.filter(depth=2).first() or Page.objects.get(depth=1)
 
 
 def _unique(name: str) -> str:
@@ -202,6 +209,38 @@ def test_bridged_tool_surfaces_api_errors_as_tool_errors():
     binding = agent_registry.build_registry().get("pages_detail")
     with pytest.raises(ToolError):
         binding.spec.fn(page_id=999999999)
+
+
+def test_bridged_write_survives_secure_ssl_redirect(settings, root_page):
+    """A bridged tool's write must persist under ``SECURE_SSL_REDIRECT=True``
+    (issue #5, agent entry point).
+
+    ``_as_acting_user`` must forward the run's acting scheme into
+    ``auth.current_scheme``: without it the in-process client speaks plain
+    http, SecurityMiddleware 301s the POST, and the client follows it as a
+    GET — the write silently saves nothing.
+    """
+
+    from wagtail_mcp.test.models import ContentPage
+
+    agent_registry.reset_cache()
+    settings.SECURE_SSL_REDIRECT = True
+    settings.ALLOWED_HOSTS = ["*"]
+    scheme_context = agent_registry._acting_scheme.set("https")
+    token_context = auth.current_token.set(make_token())  # superuser + APIToken
+    try:
+        binding = agent_registry.build_registry().get("pages_create")
+        data = binding.spec.fn(
+            type="wagtail_mcp_test.ContentPage",
+            parent_id=root_page.pk,
+            title="Agent redirect-proof",
+        )
+    finally:
+        auth.current_token.reset(token_context)
+        agent_registry._acting_scheme.reset(scheme_context)
+    assert data["title"] == "Agent redirect-proof"
+    assert "items" not in data  # a list payload means POST degraded to GET
+    assert ContentPage.objects.filter(title="Agent redirect-proof").exists()
 
 
 # --- Endpoint auth -----------------------------------------------------------

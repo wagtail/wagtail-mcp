@@ -10,7 +10,11 @@ session, and no server push, so clients that need those are unsupported.
 Non-POST methods return 405 before any auth check. How the view embeds the
 MCP SDK, and why `mcp` is pinned, is in
 [architecture](contributing/architecture.md). Absolute URLs in responses are
-covered in [configuration](configuration.md).
+covered in [configuration](configuration.md). The incoming request's scheme
+(`request.scheme`, which honours `SECURE_PROXY_SSL_HEADER`) is replicated
+in-process too, so `SECURE_SSL_REDIRECT` does not 301 internal calls (a
+followed 301 re-issues the request as GET, silently turning every write into
+a no-op read).
 
 ## Authentication
 

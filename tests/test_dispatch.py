@@ -118,6 +118,94 @@ def test_openapi_forwards_current_host(settings):
         openapi.cache_clear()
 
 
+def test_secure_follows_current_scheme():
+    """_secure() mirrors the served request's scheme, defaulting to http.
+
+    An outer https request must dispatch as secure (``secure=True``) so
+    ``SECURE_SSL_REDIRECT`` does not 301 it; anything else keeps the
+    historical plain-http behaviour (scheme *and* port — Wagtail resolves
+    sites on hostname+port, so the default must not change which site
+    absolute URLs resolve against).
+    """
+
+    assert auth.current_scheme.get() is None
+    assert dispatch._secure() is False
+    context = auth.current_scheme.set("https")
+    try:
+        assert dispatch._secure() is True
+    finally:
+        auth.current_scheme.reset(context)
+    context = auth.current_scheme.set("http")
+    try:
+        assert dispatch._secure() is False
+    finally:
+        auth.current_scheme.reset(context)
+
+
+def test_write_succeeds_with_secure_ssl_redirect(settings, token, root_page):
+    """Creates must survive SECURE_SSL_REDIRECT (issue #5).
+
+    The in-process test client defaults to plain http, so with
+    ``SECURE_SSL_REDIRECT=True`` SecurityMiddleware 301s the POST and the
+    client re-issues it as GET (the method is preserved only for 307/308) —
+    the create silently returns the collection list and saves nothing.
+    Dispatch must replicate the outer request's scheme via
+    ``auth.current_scheme``.
+    """
+
+    settings.SECURE_SSL_REDIRECT = True
+    settings.ALLOWED_HOSTS = ["*"]
+    context = auth.current_scheme.set("https")
+    try:
+        data = call_operation(
+            "pages_create",
+            body={
+                "meta": {
+                    "type": "wagtail_mcp_test.ContentPage",
+                    "parent_id": root_page.pk,
+                },
+                "title": "Redirect-proof",
+            },
+            token=token,
+        )
+    finally:
+        auth.current_scheme.reset(context)
+    assert data["title"] == "Redirect-proof"
+    assert "items" not in data  # a list payload means POST degraded to GET
+    assert ContentPage.objects.filter(title="Redirect-proof").exists()
+
+
+def test_update_succeeds_with_secure_ssl_redirect(settings, token, root_page):
+    """PATCH must survive SECURE_SSL_REDIRECT (issue #5, update variant)."""
+
+    child = ContentPage(title="Before redirect", slug="before-redirect")
+    root_page.add_child(instance=child)
+    settings.SECURE_SSL_REDIRECT = True
+    settings.ALLOWED_HOSTS = ["*"]
+    context = auth.current_scheme.set("https")
+    try:
+        data = call_operation(
+            "pages_update",
+            path_params={"page_id": child.pk},
+            body={
+                "meta": {"type": "wagtail_mcp_test.ContentPage"},
+                "title": "After redirect",
+            },
+            token=token,
+        )
+    finally:
+        auth.current_scheme.reset(context)
+    assert data["title"] == "After redirect"
+    # In Wagtail 8 the base Page carries DraftStateMixin, so editing a live
+    # page stores the change as a draft revision and leaves the live row
+    # untouched until publish. The new revision is the durable proof the
+    # PATCH reached the handler (degraded to GET, there would be no revision
+    # and the detail title would still be the old one).
+    revision = child.revisions.order_by("pk").last()
+    assert revision is not None
+    assert revision.as_object().title == "After redirect"
+
+
 def test_pages_find_follows_redirect(root_page, token):
     # pages_find returns a 302 to the page-detail URL (like any HTTP client).
     hostname = "example.test"
@@ -219,6 +307,7 @@ class FakeClient:
         FILES=None,
         host=None,
         port=None,
+        secure=None,
     ):
         self.calls.append(
             {
@@ -228,6 +317,7 @@ class FakeClient:
                 "headers": headers or {},
                 "host": host,
                 "port": port,
+                "secure": secure,
             }
         )
         return self.response
