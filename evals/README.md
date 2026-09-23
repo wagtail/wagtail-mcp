@@ -12,7 +12,8 @@ failure mode a hand-written suite cannot catch.
 ## How it works
 
 The suite runs **one prompt through two arms** over the same model
-(`deepseek/deepseek-v4-flash-0731` on TensorX):
+(`deepseek/deepseek-v4-flash-0731`, served by the configured eval provider —
+TensorX in this checkout):
 
 | arm | tools available | what it measures |
 |-----|-----------------|------------------|
@@ -55,8 +56,9 @@ Each write case embeds a per-run unique `suffix` (from
   `demo/db.sqlite3` and `demo/media`.
 - A running demo site: `just demo` (or your own `runserver`) with the v3 API
   and `/mcp/` mounted.
-- **Env vars**: `TENSORX_API_KEY` (model under test + rubric grader run on
-  TensorX). `just eval` populates `WAGTAIL_DEMO_TOKEN` from
+- **Env vars**: `TENSORX_API_KEY` (the model under test and the rubric grader
+  run on the provider configured in `evals/opencode.json` — TensorX in this
+  checkout). `just eval` populates `WAGTAIL_DEMO_TOKEN` from
   `demo/.demo_token`, `WAGTAIL_EVAL_BASE_URL` (default
   `http://localhost:8000`), and `WAGTAIL_EVAL_RUN_ID` (per-run unique id).
 

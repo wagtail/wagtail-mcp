@@ -18,7 +18,7 @@ def _model_for_settings():
 
     An empty or ``"test"`` model is pydantic-ai's ``TestModel`` (no network).
     ``openai:<name>`` with a key or base URL builds an ``OpenAIChatModel`` on
-    that provider (the TensorX shape). Anything else is returned as a string
+    that OpenAI-compatible provider. Anything else is returned as a string
     for pydantic-ai to infer.
     """
 

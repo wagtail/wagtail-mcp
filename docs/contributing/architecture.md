@@ -30,8 +30,8 @@ Modules under `wagtail_mcp.tools` register thin wrappers. Names match v3 `operat
 
 Optional extra `wagtail-mcp[agent]`. Opt-in by mounting: the URL namespace
 `wagtail_mcp_agent` only exists once the project includes
-`wagtail_mcp.agent.urls`, and every admin surface (menu item, homepage panel,
-summary item, chat page) checks that condition per request. Until then the
+`wagtail_mcp.agent.urls`, and every admin surface (menu item, chat page)
+checks that condition per request. Until then the
 page at `/admin/wagtail_mcp/agent/` renders setup instructions instead of the
 chat. The page route itself is registered unconditionally — hook URLs are
 frozen into the admin URLconf at import time, so availability is decided in
@@ -41,4 +41,9 @@ the view, not at registration. The steps are in [Admin agent](../admin-agent.md)
 
 Tool calls mint a bearer `APIToken` named `wagtail-mcp-admin-agent` on the worker thread. pydantic-ai runs sync tools off the event loop, where ORM access raises `SynchronousOnlyOperation`, so the request factory only records the user and `Host`. The process caches the plaintext (Wagtail shows it only at creation) and deletes the row after a restart. Revocation is checked on the next call.
 
-The chat bundle is `static/wagtail_mcp/js/agent.js`, built from `static_src/agent/` with `npm run build:agent`. The admin homepage panel and the standalone page both include `templates/wagtail_mcp/admin/includes/agent_mount.html`, which renders nothing when the endpoint namespace is absent. The bundle expects `#wagtail-mcp-agent-root` with `data-endpoint` (posted to as-is) and `data-csrf-token` (sent as `X-CSRFToken`). The homepage panel copies `csrf_token` into the component context, because Wagtail renders a `Component` with only what `get_context_data` returns.
+The chat bundle is `static/wagtail_mcp/js/agent.js`,
+built from `static_src/agent/` with `npm run build:agent`. The standalone
+chat page includes `templates/wagtail_mcp/admin/includes/agent_mount.html`,
+which renders nothing when the endpoint namespace is absent. The bundle expects
+`#wagtail-mcp-agent-root` with `data-endpoint` (posted to as-is) and
+`data-csrf-token` (sent as `X-CSRFToken`).

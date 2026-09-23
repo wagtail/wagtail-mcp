@@ -20,7 +20,8 @@
 #   - `just eval-init` — installs promptfoo, @opencode-ai/sdk, the OpenCode CLI.
 #   - `just eval-setup` — resets the demo DB + creates a demo token.
 #   - `just demo` (or any runserver) running against the demo v3 API + /mcp/.
-#   - TENSORX_API_KEY (model + rubric grader run on TensorX), and
+#   - the eval provider's API key (TENSORX_API_KEY — model + rubric grader run
+#     on the provider in evals/opencode.json), and
 #     WAGTAIL_DEMO_TOKEN + WAGTAIL_EVAL_RUN_ID.
 #   `just eval` sets OPENCODE_CONFIG=evals/opencode.json and exports the above.
 

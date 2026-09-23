@@ -8,5 +8,20 @@
 {% endblock %}
 
 {% block main_content %}
-    {% include "wagtail_mcp/admin/includes/agent_mount.html" %}
+    {% url 'wagtail_mcp_agent:endpoint' as agent_endpoint %}
+    {% if agent_endpoint %}
+        {% include "wagtail_mcp/admin/includes/agent_mount.html" %}
+    {% else %}
+        {# Opt-in setup instructions: shown until the project mounts wagtail_mcp.agent.urls. #}
+        {% load static %}
+        <div class="nice-padding">
+            <p class="w-help-text">
+                {% trans "The admin agent is not mounted. Add the AG-UI endpoint to your project's URLconf to enable the chat: see the wagtail-mcp documentation." %}
+            </p>
+            <pre>{% filter force_escape %}urlpatterns = [
+    path("admin/wagtail_mcp/agent/api/", include("wagtail_mcp.agent.urls")),
+    # ... before the admin include
+]{% endfilter %}</pre>
+        </div>
+    {% endif %}
 {% endblock %}

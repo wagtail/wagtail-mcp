@@ -50,11 +50,12 @@ tokens. Revoking it stops the agent on the next tool call.
 `WAGTAIL_MCP` keys are in [configuration](configuration.md). An empty or
 `"test"` model uses pydantic-ai's `TestModel`, which calls the tools without
 a provider. `openai:<model>` with a key or base URL uses that
-OpenAI-compatible endpoint (TensorX in the demo). Any other string is left
+OpenAI-compatible endpoint. Any other string is left
 for pydantic-ai to resolve.
 
-The demo, when `TENSORX_API_KEY` is set and `WAGTAIL_MCP_AGENT_MODEL` is not,
-defaults the model to `openai:z-ai/glm-5.3-flash`.
+The demo reads `WAGTAIL_MCP_AGENT_MODEL`, `WAGTAIL_MCP_AGENT_API_KEY` and
+`WAGTAIL_MCP_AGENT_BASE_URL` from the environment into `WAGTAIL_MCP` (see
+`demo/demo/settings/dev.py`).
 
 How the endpoint is wired, how the token is cached, and how the frontend
 bundle is built: [architecture](contributing/architecture.md).

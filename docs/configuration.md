@@ -7,9 +7,9 @@ A dict, merged over defaults. Currently supported keys:
 | Key | Default | Meaning |
 |---|---|---|
 | `require_auth` | `True` | Whether the MCP endpoint requires a valid bearer token. `False` allows anonymous tool calls for local tinkering only. |
-| `agent_model` | `""` | pydantic-ai model for the [admin agent](admin-agent.md). Empty or `"test"` uses `TestModel` (no provider). `"openai:<model>"` uses the key and base URL below. Any other string is passed through to pydantic-ai. |
-| `agent_api_key` | `""` | Provider key for `agent_model`. Empty falls back to `TENSORX_API_KEY`. |
-| `agent_base_url` | `""` | Provider base URL for `agent_model`. Empty falls back to `TENSORX_BASE_URL`. |
+| `agent_model` | `""` | pydantic-ai model for the [admin agent](admin-agent.md). Empty or `"test"` uses `TestModel` (no provider). `"openai:<model>"` uses the key and base URL below (any OpenAI-compatible endpoint). Any other string is passed through to pydantic-ai. |
+| `agent_api_key` | `""` | Provider key for `agent_model`. |
+| `agent_base_url` | `""` | Provider base URL for `agent_model`. |
 
 ```python
 WAGTAIL_MCP = {

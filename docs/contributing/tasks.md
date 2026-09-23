@@ -36,7 +36,10 @@ just eval --repeat 3    # repeat before trusting a delta
 just eval-view          # dashboard for the latest run
 ```
 
-`just eval-setup` and `just eval` read `TENSORX_API_KEY` (model and rubric grader) and the demo token in `demo/.demo_token`. The global installs stay out of `package.json` so a checkout that never runs evals does not pay for them.
+`just eval` reads the model-provider API key from the environment (see
+`evals/README.md`) and the demo token in `demo/.demo_token`. The global
+installs stay out of `package.json` so a checkout that never runs evals does
+not pay for them.
 
 ## Code review
 

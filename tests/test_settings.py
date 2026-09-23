@@ -21,37 +21,28 @@ def test_partial_override_keeps_defaults(settings):
     assert get_config()["require_auth"] is True
 
 
-def test_agent_config_env_fallback(settings, monkeypatch):
-    # Unset everywhere: the agent runs on TestModel (empty model string).
-    monkeypatch.delenv("TENSORX_API_KEY", raising=False)
-    monkeypatch.delenv("TENSORX_BASE_URL", raising=False)
+def test_agent_config_defaults_to_test_model(settings, monkeypatch):
+    # Unset in settings: the agent runs on TestModel (empty model string).
+    # Environment variables are not consulted — projects wire env vars into
+    # WAGTAIL_MCP themselves (see demo/demo/settings/dev.py).
+    monkeypatch.setenv("PROVIDER_API_KEY", "example-key")
+    monkeypatch.setenv("PROVIDER_BASE_URL", "https://provider.example")
     settings.WAGTAIL_MCP = {}
-    config = get_agent_config()
-    assert config == {"model": "", "api_key": "", "base_url": ""}
+    assert get_agent_config() == {"model": "", "api_key": "", "base_url": ""}
 
 
-def test_agent_config_tensorx_env(settings, monkeypatch):
-    monkeypatch.setenv("TENSORX_API_KEY", "tensorx-key")
-    monkeypatch.setenv("TENSORX_BASE_URL", "https://tensorx.example")
-    settings.WAGTAIL_MCP = {}
-    assert get_agent_config() == {
-        "model": "",
-        "api_key": "tensorx-key",
-        "base_url": "https://tensorx.example",
-    }
-
-
-def test_agent_config_settings_override_env(settings, monkeypatch):
-    monkeypatch.setenv("TENSORX_API_KEY", "tensorx-key")
-    monkeypatch.setenv("TENSORX_BASE_URL", "https://api.tensorx.ai/v1")
+def test_agent_config_from_settings(settings, monkeypatch):
+    # The project supplies the provider credentials directly in settings,
+    # env vars are ignored.
+    monkeypatch.setenv("PROVIDER_API_KEY", "example-key")
+    monkeypatch.setenv("PROVIDER_BASE_URL", "https://provider.example")
     settings.WAGTAIL_MCP = {
         "agent_model": "openai:some-model",
         "agent_api_key": "settings-key",
+        "agent_base_url": "https://provider.example/v1",
     }
-    # Per-key precedence: a settings value wins; an unset one falls back to
-    # the env var (base_url was not overridden).
     assert get_agent_config() == {
         "model": "openai:some-model",
         "api_key": "settings-key",
-        "base_url": "https://api.tensorx.ai/v1",
+        "base_url": "https://provider.example/v1",
     }

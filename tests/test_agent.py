@@ -355,42 +355,48 @@ def test_agent_page_anonymous_redirects_to_login(client):
     assert "/admin/login/" in response["Location"]
 
 
-def test_admin_home_renders_agent_panel(client):
+def test_admin_home_shows_agent_menu_item(client):
+    """Mounted endpoint: the sidebar menu item links to the agent page."""
     make_admin(client)
     response = client.get("/admin/")
     assert response.status_code == 200
     html = response.content.decode()
-    assert 'id="wagtail-mcp-agent-root"' in html
-    assert 'data-endpoint="/admin/wagtail_mcp/agent/api/"' in html
-    assert 'data-csrf-token="' in html
-    assert 'data-csrf-token=""' not in html
-    assert html.count("wagtail_mcp/js/agent.js") == 1
-
-
-def test_admin_home_renders_mcp_summary_item(client):
-    # Regression: WagtailMCPSummaryItem referenced a template that did not
-    # exist, which 500'd the whole admin home for every logged-in user.
-    make_admin(client)
-    response = client.get("/admin/")
-    assert response.status_code == 200
-    html = response.content.decode()
-    assert "w-summary__list" in html
     assert "/admin/wagtail_mcp/agent/" in html
-    assert "Agent" in html
+    # The chat itself only mounts on the agent page, not the homepage.
+    assert 'id="wagtail-mcp-agent-root"' not in html
+    assert "wagtail_mcp/js/agent.js" not in html
+
+
+def test_agent_page_renders_setup_instructions_when_unmounted(settings, client):
+    """Without the agent URLconf mount, the agent page degrades to setup
+    instructions instead of the chat mount (see docs/admin-agent.md)."""
+    settings.ROOT_URLCONF = "urls_without_agent"
+    from django.urls import clear_url_caches
+
+    clear_url_caches()
+    make_admin(client)
+    response = client.get("/admin/wagtail_mcp/agent/")
+    clear_url_caches()
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert 'id="wagtail-mcp-agent-root"' not in html
+    assert "wagtail_mcp/js/agent.js" not in html
 
 
 # --- Opt-in gating ------------------------------------------------------------
 
 
 def test_gated_surfaces_visible_when_endpoint_mounted(client):
-    """Mounted endpoint: menu, panel, summary and chat all render."""
+    """Mounted endpoint: menu item, chat page and chat mount all render."""
     make_admin(client)
     homepage = client.get("/admin/").content.decode()
     page = client.get("/admin/wagtail_mcp/agent/").content.decode()
     assert try_reverse_agent_endpoint() == "/admin/wagtail_mcp/agent/api/"
-    assert 'id="wagtail-mcp-agent-root"' in homepage
-    assert "/admin/wagtail_mcp/agent/" in homepage  # menu + summary link
+    assert "/admin/wagtail_mcp/agent/" in homepage  # menu item
     assert 'id="wagtail-mcp-agent-root"' in page
+    assert 'data-endpoint="/admin/wagtail_mcp/agent/api/"' in page
+    assert 'data-csrf-token="' in page
+    assert 'data-csrf-token=""' not in page
 
 
 def test_unmounted_endpoint_hides_every_agent_surface(settings, client):
@@ -410,11 +416,6 @@ def test_unmounted_endpoint_hides_every_agent_surface(settings, client):
     assert 'id="wagtail-mcp-agent-root"' not in html
     assert "wagtail_mcp/js/agent.js" not in html
     assert "/admin/wagtail_mcp/agent/" not in html
-
-    agent_page = client.get("/admin/wagtail_mcp/agent/")
-    clear_url_caches()
-    assert agent_page.status_code == 200
-    assert "not mounted" in agent_page.content.decode()
 
 
 def test_unmounted_endpoint_hides_menu_item_for_every_admin_page(client, settings):
