@@ -7,30 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-- The `agent` extra no longer pins `uvicorn`: the ASGI server is the
-  adopter's choice (`uvicorn`, `daphne`, ...). The demo's `just runserver-asgi`
-  injects `uvicorn` itself.
-- Documentation is split into user guides and reference under `docs/`, and contributor notes under `docs/contributing/`.
-
 ### Fixed
 
-- The admin agent is now fully opt-in: without the agent URLconf mount, no
-  agent UI appears in the Wagtail admin, and the admin homepage no longer
-  500s. `/admin/wagtail_mcp/agent/` renders setup instructions instead.
-- The agent chat now mounts only on `/admin/wagtail_mcp/agent/` — the admin
-  homepage panel and summary item are gone.
-- `get_agent_config()` no longer falls back to environment variables for the
-  agent's provider credentials: set them in `WAGTAIL_MCP`
-  (`agent_api_key`, `agent_base_url`).
-- CI test jobs now install the `agent` extra (`uv sync --extra agent` /
-  `--extra agent`), fixing `ModuleNotFoundError: django_ag_ui` in
-  `test_flow_agent_run.py`, and the compatibility job's undefined
-  `matrix.packages` reference.
+- Support `SECURE_SSL_REDIRECT=True`. ty [@ivanscm](https://github.com/ivanscm)!
 
 ### Added
 
-- Experimental admin agent: the MCP tools as a chat in the Wagtail admin, over AG-UI. Requires the `agent` extra, an ASGI server, and mounting the endpoint URLconf. See [docs/admin-agent.md](docs/admin-agent.md).
+- Optional, experimental admin agent: use the same MCP tools as a chat in the Wagtail admin, over AG-UI.
 
 ## [0.2.0] - 2026-09-18
 
