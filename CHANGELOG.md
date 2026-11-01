@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `subscriptions/listen` (MCP 2026-07-28) no longer hangs the request: it is answered with "method not found", and `server/discover` no longer advertises change notifications, so clients such as Claude Code do not open one. Under a sync server (e.g. gunicorn) each listen used to hold a worker until its timeout.
+
 ## [0.3.0] - 2026-09-23
 
 ### Fixed

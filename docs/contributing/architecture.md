@@ -14,6 +14,8 @@ The v3 API must be mounted at `/api/v3/` (`MOUNT_PREFIX`). Schema paths already 
 
 `wagtail_mcp.views` embeds the MCP SDK's ASGI Streamable HTTP transport in a sync Django view. Each POST builds an ASGI scope, runs a new stateless `StreamableHTTPSessionManager`, and copies the ASGI messages into an `HttpResponse`. Nothing is kept between requests, so WSGI and ASGI behave the same.
 
+Because the view collects the whole reply before returning, it cannot serve endless SSE streams. GET (the standalone stream) gets 405, and `subscriptions/listen` (the 2026-07-28 change-notification stream) gets JSON-RPC "method not found" (HTTP 404) before the SDK sees it. `get_server()` unregisters the SDK's listen handler, so `server/discover` does not advertise `listChanged` or `subscribe`. The ASGI `receive()` hands over the request body once and then waits until cancelled. The SDK's SSE path loops on `receive()` until a disconnect, and a `receive()` that returned immediately would spin that loop forever.
+
 The view reaches the transport through `MCPServer._lowlevel_server`, a private SDK attribute. `mcp` is pinned to the version this was written against. An upgrade has to re-check that accessor and the per-request manager lifecycle.
 
 The SDK's DNS-rebinding and Origin checks are off. Django's `ALLOWED_HOSTS` is the host gate, which is why `require_auth: False` is unsafe behind a lenient proxy. See [configuration](../configuration.md).
