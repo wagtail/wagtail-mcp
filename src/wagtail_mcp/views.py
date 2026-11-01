@@ -3,6 +3,9 @@
 See docs/contributing/architecture.md.
 """
 
+import asyncio
+import json
+
 from asgiref.sync import async_to_sync
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -13,6 +16,11 @@ from mcp.server.transport_security import TransportSecuritySettings
 from wagtail_mcp import auth
 from wagtail_mcp.server import get_server
 from wagtail_mcp.settings import get_config
+
+
+SUBSCRIPTIONS_LISTEN = "subscriptions/listen"
+# JSON-RPC "method not found".
+METHOD_NOT_FOUND = -32601
 
 
 def _encode_header(value):
@@ -55,9 +63,15 @@ def _build_scope(request):
 def _handle_stateless(request, scope):
     """Run one stateless MCP request; return the collected ``HttpResponse``."""
     body = request.body
+    body_sent = False
 
     async def receive():
-        return {"type": "http.request", "body": body, "more_body": False}
+        # Body once, then wait: the SDK loops on receive() until a disconnect.
+        nonlocal body_sent
+        if not body_sent:
+            body_sent = True
+            return {"type": "http.request", "body": body, "more_body": False}
+        await asyncio.Event().wait()
 
     start_message = {}
     body_chunks = []
@@ -102,13 +116,34 @@ def _handle_stateless(request, scope):
     return response
 
 
+def _subscriptions_listen_id(request):
+    """The JSON-RPC id of a ``subscriptions/listen`` request, else ``False``.
+
+    The method is named by the ``Mcp-Method`` header (2026-07-28 clients) or
+    the body; the id may be ``None`` when the body has none.
+    """
+    try:
+        message = json.loads(request.body)
+    except ValueError:
+        message = None
+    if not isinstance(message, dict):
+        message = {}
+    if SUBSCRIPTIONS_LISTEN in (
+        request.headers.get("Mcp-Method"),
+        message.get("method"),
+    ):
+        return message.get("id")
+    return False
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def mcp_endpoint(request):
     """MCP endpoint: POST JSON-RPC messages via stateless Streamable HTTP.
 
     Non-POST methods yield 405 (from ``require_http_methods``) — this endpoint
-    does not serve the SSE GET stream; stateless JSON responses only.
+    does not serve the SSE GET stream; stateless JSON responses only. For the
+    same reason ``subscriptions/listen`` gets "method not found".
     """
     config = get_config()
     token = auth.resolve_bearer(request)
@@ -116,6 +151,20 @@ def mcp_endpoint(request):
         response = JsonResponse({"error": "invalid_token"}, status=401)
         response["WWW-Authenticate"] = "Bearer"
         return response
+
+    listen_id = _subscriptions_listen_id(request)
+    if listen_id is not False:
+        return JsonResponse(
+            {
+                "jsonrpc": "2.0",
+                "id": listen_id,
+                "error": {
+                    "code": METHOD_NOT_FOUND,
+                    "message": f"Method not found: {SUBSCRIPTIONS_LISTEN}",
+                },
+            },
+            status=404,
+        )
 
     context_token = auth.current_token.set(token)
     try:

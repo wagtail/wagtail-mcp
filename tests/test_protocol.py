@@ -1,4 +1,6 @@
+import contextlib
 import json
+import signal
 
 import pytest
 
@@ -204,3 +206,114 @@ def test_require_auth_false_anonymous_tool_call_is_error(client, settings):
     assert result.get("isError") is True
     text = result["content"][0]["text"]
     assert "401" in text or "Unauthorized" in text or "API token" in text
+
+
+# MCP 2026-07-28: per-request envelope in ``params._meta`` plus routing headers.
+MODERN_VERSION = "2026-07-28"
+
+
+@contextlib.contextmanager
+def fails_after(seconds):
+    """Fail instead of hanging the suite when a request never returns."""
+
+    def timed_out(signum, frame):
+        raise TimeoutError(f"no response within {seconds}s")
+
+    previous = signal.signal(signal.SIGALRM, timed_out)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
+
+
+def modern_payload(method, params=None, request_id=1):
+    params = dict(params or {})
+    params["_meta"] = {
+        "io.modelcontextprotocol/protocolVersion": MODERN_VERSION,
+        "io.modelcontextprotocol/clientCapabilities": {},
+    }
+    return {"jsonrpc": "2.0", "id": request_id, "method": method, "params": params}
+
+
+def post_modern(client, token, method, params=None):
+    with fails_after(10):
+        return client.post(
+            "/mcp/",
+            json.dumps(modern_payload(method, params)),
+            content_type="application/json",
+            HTTP_ACCEPT=ACCEPT,
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+            HTTP_MCP_METHOD=method,
+            HTTP_MCP_PROTOCOL_VERSION=MODERN_VERSION,
+        )
+
+
+@pytest.mark.django_db
+def test_discover_does_not_advertise_change_notifications(client, token):
+    """listChanged/subscribe promise a subscriptions/listen stream, which the
+    stateless endpoint cannot serve; clients open one when they see them."""
+    response = post_modern(client, token, "server/discover")
+    assert response.status_code == 200, response.content
+    capabilities = response.json()["result"]["capabilities"]
+    for name in ("tools", "prompts", "resources"):
+        assert not capabilities.get(name, {}).get("listChanged"), capabilities
+    assert not capabilities.get("resources", {}).get("subscribe"), capabilities
+
+
+@pytest.mark.django_db
+def test_subscriptions_listen_is_method_not_found(client, token):
+    response = post_modern(
+        client,
+        token,
+        "subscriptions/listen",
+        {"notifications": {"toolsListChanged": True}},
+    )
+    assert response.status_code == 404, response.content
+    assert response.json() == {
+        "jsonrpc": "2.0",
+        "id": 1,
+        "error": {"code": -32601, "message": "Method not found: subscriptions/listen"},
+    }
+
+
+@pytest.mark.django_db
+def test_streamed_reply_does_not_hang(rf, token):
+    """The SDK answers subscriptions/listen on its SSE path, which loops on
+    ``receive()`` until a disconnect. ``receive()`` must wait after the body
+    rather than return it again, or that loop never yields (the request hung
+    until the worker was killed). Called below the view's guard on purpose."""
+    from wagtail_mcp.views import _build_scope, _handle_stateless
+
+    request = rf.post(
+        "/mcp/",
+        json.dumps(
+            modern_payload(
+                "subscriptions/listen", {"notifications": {"toolsListChanged": True}}
+            )
+        ),
+        content_type="application/json",
+        HTTP_ACCEPT=ACCEPT,
+        HTTP_MCP_METHOD="subscriptions/listen",
+        HTTP_MCP_PROTOCOL_VERSION=MODERN_VERSION,
+    )
+    with fails_after(10):
+        response = _handle_stateless(request, _build_scope(request))
+    assert json.loads(response.content)["error"]["code"] == -32601
+
+
+@pytest.mark.django_db
+def test_modern_tool_call_still_works(client, token):
+    with fails_after(10):
+        response = client.post(
+            "/mcp/",
+            json.dumps(modern_payload("tools/list")),
+            content_type="application/json",
+            HTTP_ACCEPT=ACCEPT,
+            HTTP_AUTHORIZATION=f"Bearer {token}",
+            HTTP_MCP_METHOD="tools/list",
+            HTTP_MCP_PROTOCOL_VERSION=MODERN_VERSION,
+        )
+    assert response.status_code == 200, response.content
+    assert response.json()["result"]["tools"]
