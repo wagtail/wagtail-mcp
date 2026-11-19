@@ -3,6 +3,8 @@
 See docs/contributing/architecture.md.
 """
 
+import math
+
 from asgiref.sync import async_to_sync
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -10,7 +12,7 @@ from django.views.decorators.http import require_http_methods
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
 from mcp.server.transport_security import TransportSecuritySettings
 
-from wagtail_mcp import auth
+from wagtail_mcp import auth, limits
 from wagtail_mcp.server import get_server
 from wagtail_mcp.settings import get_config
 
@@ -111,11 +113,29 @@ def mcp_endpoint(request):
     does not serve the SSE GET stream; stateless JSON responses only.
     """
     config = get_config()
+
+    # Checked from the declared length, before the body is read or the token
+    # is looked up, so an oversized request is cheap to refuse.
+    max_bytes = config.get("max_request_bytes")
+    if max_bytes is not None and limits.content_length(request) > max_bytes:
+        return JsonResponse({"error": "request_too_large"}, status=413)
+
     token = auth.resolve_bearer(request)
     if config.get("require_auth", True) and token is None:
         response = JsonResponse({"error": "invalid_token"}, status=401)
         response["WWW-Authenticate"] = "Bearer"
         return response
+
+    # After auth, so requests with bad tokens cannot fill the limiter.
+    rate_limit = config.get("rate_limit_requests")
+    if rate_limit is not None:
+        retry_after = limits.rate_limiter.hit(
+            limits.token_key(token), rate_limit, config["rate_limit_window"]
+        )
+        if retry_after:
+            response = JsonResponse({"error": "rate_limited"}, status=429)
+            response["Retry-After"] = str(math.ceil(retry_after))
+            return response
 
     context_token = auth.current_token.set(token)
     try:

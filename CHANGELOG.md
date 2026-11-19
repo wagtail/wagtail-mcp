@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional `WAGTAIL_MCP` limits for production: `max_request_bytes` rejects oversized request bodies with 413, and `rate_limit_requests` / `rate_limit_window` apply a per-token rate limit that answers 429 with `Retry-After`. Both are off by default.
+
 ## [0.3.0] - 2026-09-23
 
 ### Fixed

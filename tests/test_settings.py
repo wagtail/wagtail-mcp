@@ -4,6 +4,9 @@ from wagtail_mcp.settings import get_agent_config, get_config
 def test_defaults():
     assert get_config() == {
         "require_auth": True,
+        "max_request_bytes": None,
+        "rate_limit_requests": None,
+        "rate_limit_window": 60,
         "agent_model": "",
         "agent_api_key": "",
         "agent_base_url": "",
