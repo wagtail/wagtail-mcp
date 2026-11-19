@@ -7,6 +7,9 @@ A dict, merged over defaults. Currently supported keys:
 | Key | Default | Meaning |
 |---|---|---|
 | `require_auth` | `True` | Whether the MCP endpoint requires a valid bearer token. `False` allows anonymous tool calls for local tinkering only. |
+| `max_request_bytes` | `None` | Reject POST bodies whose `Content-Length` exceeds this many bytes with `413`, before the token is checked. `None` applies no limit beyond Django's own settings. |
+| `rate_limit_requests` | `None` | Maximum requests per token within `rate_limit_window`. Further requests get `429` with a `Retry-After` header. `None` disables the limit. |
+| `rate_limit_window` | `60` | Length in seconds of the rate-limit window. |
 | `agent_model` | `""` | pydantic-ai model for the [admin agent](admin-agent.md). Empty or `"test"` uses `TestModel` (no provider). `"openai:<model>"` uses the key and base URL below (any OpenAI-compatible endpoint). Any other string is passed through to pydantic-ai. |
 | `agent_api_key` | `""` | Provider key for `agent_model`. |
 | `agent_base_url` | `""` | Provider base URL for `agent_model`. |
@@ -14,8 +17,18 @@ A dict, merged over defaults. Currently supported keys:
 ```python
 WAGTAIL_MCP = {
     "require_auth": True,
+    "max_request_bytes": 1_000_000,
+    "rate_limit_requests": 120,
+    "rate_limit_window": 60,
 }
 ```
+
+The rate limit is a sliding window kept in process memory, keyed by a hash of
+the bearer token. With several worker processes each worker counts on its own,
+so the effective ceiling is `rate_limit_requests` times the number of workers.
+It runs after authentication, so requests with invalid tokens do not use up a
+valid token's allowance. Use a reverse proxy for limits that must be shared
+across workers or applied to unauthenticated traffic.
 
 The admin agent is optional (`wagtail-mcp[agent]`) and needs an ASGI server.
 See [admin agent](admin-agent.md).
